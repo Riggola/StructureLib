@@ -325,7 +325,7 @@ public class StructureUtility {
      * Falls back to the server side display name for stacks whose name is not a plain translation key, e.g. items that
      * assemble their name in {@link Item#getItemStackDisplayName(ItemStack)}.
      */
-    private static IChatComponent getStackChatName(ItemStack stack) {
+    static IChatComponent getStackChatName(ItemStack stack) {
         String key = stack.getUnlocalizedName() + ".name";
         if (!StatCollector.canTranslate(key)) return stack.func_151000_E();
         IChatComponent name = new ChatComponentText("[").appendSibling(new ChatComponentTranslation(key))

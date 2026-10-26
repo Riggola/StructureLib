@@ -19,6 +19,7 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.ChatComponentTranslation;
 import net.minecraft.util.IChatComponent;
 import net.minecraft.world.World;
 
@@ -193,7 +194,11 @@ public interface IStructureElement<T> {
                         actor,
                         chatter);
             }
+            ItemStack onlyCandidate = null;
+            boolean multipleCandidates = false;
             for (ItemStack stack : e.getStacks()) {
+                if (onlyCandidate == null) onlyCandidate = stack;
+                else multipleCandidates = true;
                 if (!source.takeOne(stack, true)) continue;
                 return StructureUtility.survivalPlaceBlock(
                         stack,
@@ -207,6 +212,14 @@ public interface IStructureElement<T> {
                         source,
                         actor,
                         chatter);
+            }
+            // Give a specific missing-block error only when this position has one exact requirement.
+            // Elements accepting multiple alternatives (e.g. hatches) keep their existing behavior.
+            if (onlyCandidate != null && !multipleCandidates && chatter != null) {
+                chatter.accept(
+                        new ChatComponentTranslation(
+                                "structurelib.autoplace.missing_block",
+                                StructureUtility.getStackChatName(onlyCandidate)));
             }
             return PlaceResult.REJECT;
         }
