@@ -97,7 +97,7 @@ public class ItemConstructableTriggerV2 extends ItemConstructableTrigger {
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.mode.dismantle"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.0"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.1"));
-        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.3"));
+        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.2"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.5"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.6"));
 
@@ -107,6 +107,5 @@ public class ItemConstructableTriggerV2 extends ItemConstructableTrigger {
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.wireless.bind"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.mode.toggle"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.wireless.desc.3"));
-        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.wireless.desc.4"));
     }
 }

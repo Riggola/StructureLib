@@ -19,7 +19,10 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraft.world.World;
@@ -407,13 +410,9 @@ public enum DismantleManager {
         StructureLib.sendWirelessLink(
                 new WirelessLinkMessage(true, requested.x, requested.y, requested.z, player.dimension, sight.sideHit),
                 player);
-        say(
-                player,
-                "structurelib.wireless.linked",
-                controllerDisplayName(controller),
-                requested.x,
-                requested.y,
-                requested.z);
+        IChatComponent name = new ChatComponentText(controllerDisplayName(controller));
+        name.getChatStyle().setColor(EnumChatFormatting.YELLOW);
+        say(player, "structurelib.wireless.linked", name, requested.x, requested.y, requested.z);
     }
 
     private WirelessLink validLink(EntityPlayerMP player) {
