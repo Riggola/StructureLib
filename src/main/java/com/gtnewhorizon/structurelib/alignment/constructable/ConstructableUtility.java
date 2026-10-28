@@ -16,8 +16,6 @@ import com.gtnewhorizon.structurelib.StructureLib;
 import com.gtnewhorizon.structurelib.StructureLibAPI;
 import com.gtnewhorizon.structurelib.alignment.IAlignment;
 import com.gtnewhorizon.structurelib.alignment.enumerable.ExtendedFacing;
-import com.gtnewhorizon.structurelib.dismantle.DismantleManager;
-import com.gtnewhorizon.structurelib.item.ItemConstructableTriggerV2;
 import com.gtnewhorizon.structurelib.item.ItemDebugConstructableTrigger;
 import com.gtnewhorizon.structurelib.item.ProjectorTier;
 import com.gtnewhorizon.structurelib.structure.IItemSource;
@@ -123,8 +121,6 @@ public class ConstructableUtility {
             // do construct
             if (aPlayer.capabilities.isCreativeMode || aStack.getItem() instanceof ItemDebugConstructableTrigger) {
                 constructable.construct(aStack, false);
-                if (aStack.getItem() instanceof ItemConstructableTriggerV2)
-                    DismantleManager.INSTANCE.onCompletedBuild(playerMP);
             } else if (constructable instanceof ISurvivalConstructable) {
                 int built = ((ISurvivalConstructable) constructable).survivalConstruct(
                         aStack,
@@ -134,8 +130,6 @@ public class ConstructableUtility {
                     playerMP.addChatMessage(new ChatComponentTranslation("structurelib.autoplace.built_stat", built));
                 } else if (built == -1) {
                     playerMP.addChatMessage(new ChatComponentTranslation("structurelib.autoplace.complete"));
-                    if (aStack.getItem() instanceof ItemConstructableTriggerV2)
-                        DismantleManager.INSTANCE.onCompletedBuild(playerMP);
                 }
                 setLastUseMilis(aPlayer);
             } else {

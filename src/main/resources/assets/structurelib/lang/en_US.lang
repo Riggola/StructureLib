@@ -65,7 +65,7 @@ structurelib.dismantle.mode.build=§aProjector Mode: Build
 structurelib.dismantle.prompt=§6Hold Sneak + Right Click to dismantle.
 structurelib.dismantle.hold=§6Dismantle in: %s
 structurelib.wireless.mode=§bProjector Wireless enabled by a valid controller link.
-structurelib.wireless.linked=§bProjector linked: %s at X: %s, Y: %s, Z: %s (dimension %s).
+structurelib.wireless.linked=§bLinked to: §e%s §bX§f: %s, §bY§f: %s, §bZ§f: %s
 structurelib.wireless.unlinked=§eProjector wireless link cleared.
 structurelib.wireless.not_controller=§cCannot link: target is not a supported multiblock controller.
 structurelib.wireless.no_link=§cNo wireless controller linked. Left Click a controller first.
@@ -246,8 +246,6 @@ structurelib.config.client.hologram.removeColliding=Remove Colliding Holograms
 structurelib.config.client.hologram.removeColliding.tooltip=Whether an attempt will be made to remove any existing hologram that collides with a new hologram.
 structurelib.config.common.hologram.dismantleHoldTicks=Dismantle Hold Duration (ticks)
 structurelib.config.common.hologram.dismantleHoldTicks.tooltip=Continuous server ticks required before dismantling can start. 20 ticks = 1 second; minimum 20.
-structurelib.config.common.hologram.dismantleProtectSharedBlocks=Protect Shared Structure Blocks
-structurelib.config.common.hologram.dismantleProtectSharedBlocks.tooltip=Conservative wall-sharing guard for loaded constructable controllers.
 structurelib.config.common.hologram.dismantleSharedScanRadius=Shared Block Scan Radius
 structurelib.config.common.hologram.dismantleSharedScanRadius.tooltip=Additional controller search radius around the dismantled structure in blocks.
 structurelib.config.common.hologram.dismantleSharedScanLimit=Shared Block Controller Scan Limit

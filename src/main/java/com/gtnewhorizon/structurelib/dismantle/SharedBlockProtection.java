@@ -1,5 +1,6 @@
 package com.gtnewhorizon.structurelib.dismantle;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -17,9 +18,8 @@ import com.gtnewhorizon.structurelib.structure.StructureCapture.Candidate;
 import com.gtnewhorizon.structurelib.structure.StructureCapture.Position;
 
 /**
- * Conservative wall-sharing guard. Protect any occupied primary position included in another loaded constructable
- * controller's structure traversal. A controller can temporarily report itself unformed while still owning shared
- * casings; never use that flag to exclude it.
+ * Conservative wall-sharing guard. Protect occupied primary positions included in other loaded controllers' structure
+ * traversals. GT5 controllers confirmed unformed with no pending structure check do not own shared walls.
  */
 final class SharedBlockProtection {
 
@@ -71,10 +71,9 @@ final class SharedBlockProtection {
                     || world.getTileEntity(tile.xCoord, tile.yCoord, tile.zCoord) != tile)
                 continue;
 
-            // Include unformed controllers too: mMachine can be false during structure updates,
-            // and using it as a filter caused shared blocks to be destroyed.
             IConstructable constructable = ConstructableUtility.getConstructable(tile, 2);
             if (constructable == null) continue;
+            if (isStablyUnformed(tile)) continue;
             if (++inspected > scanLimit) {
                 StructureLib.LOGGER.warn("Dismantle wall-sharing scan hit the limit of {} controllers", scanLimit);
                 return null;
@@ -113,5 +112,21 @@ final class SharedBlockProtection {
                 inspected,
                 shared.size());
         return shared;
+    }
+
+    /** Unknown controller types and pending GT5 structure checks stay protected. */
+    private static boolean isStablyUnformed(TileEntity tile) {
+        try {
+            Object meta = tile.getClass().getMethod("getMetaTileEntity").invoke(tile);
+            if (meta == null) return false;
+            Class<?> type = meta.getClass();
+            Field formed = type.getField("mMachine");
+            return !formed.getBoolean(meta) && !type.getField("mStructureChanged").getBoolean(meta)
+                    && !type.getField("mUpdated").getBoolean(meta)
+                    && type.getField("mUpdate").getInt(meta) <= 0
+                    && type.getField("mStartUpCheck").getInt(meta) <= 0;
+        } catch (ReflectiveOperationException | IllegalArgumentException | SecurityException ignored) {
+            return false;
+        }
     }
 }

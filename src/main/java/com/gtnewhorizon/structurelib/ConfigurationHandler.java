@@ -34,7 +34,6 @@ public enum ConfigurationHandler {
     private int autoPlaceBudget;
     private int autoPlaceInterval;
     private int dismantleHoldTicks;
-    private boolean dismantleProtectSharedBlocks;
     private int dismantleSharedScanRadius;
     private int dismantleSharedScanLimit;
     private Map<String, Pair<List<String>, List<String>>> registryOrders;
@@ -109,13 +108,6 @@ public enum ConfigurationHandler {
                 1200,
                 "Number of continuous server ticks (20 ticks = 1 second) required to confirm dismantling."
                         + " The server setting is authoritative; values below 20 are disallowed.");
-        dismantleProtectSharedBlocks = config.getBoolean(
-                "dismantleProtectSharedBlocks",
-                "common.hologram",
-                true,
-                "Before dismantling, preserve occupied structure positions that also belong to other loaded"
-                        + " constructable controllers. If the scan cannot finish safely, dismantling will not"
-                        + " start. Unloaded controllers cannot be detected; back up shared structures first.");
         dismantleSharedScanRadius = config.getInt(
                 "dismantleSharedScanRadius",
                 "common.hologram",
@@ -213,10 +205,6 @@ public enum ConfigurationHandler {
 
     public int getDismantleHoldTicks() {
         return dismantleHoldTicks;
-    }
-
-    public boolean isDismantleProtectSharedBlocks() {
-        return dismantleProtectSharedBlocks;
     }
 
     public int getDismantleSharedScanRadius() {

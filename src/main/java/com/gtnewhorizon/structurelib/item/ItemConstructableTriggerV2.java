@@ -14,7 +14,6 @@ import net.minecraft.world.World;
 import org.lwjgl.input.Keyboard;
 
 import com.gtnewhorizon.structurelib.alignment.constructable.ChannelDataAccessor;
-import com.gtnewhorizon.structurelib.dismantle.DismantleManager;
 
 /** Upgraded hologram projector. The original item retains its unchanged Build-only interactions. */
 public class ItemConstructableTriggerV2 extends ItemConstructableTrigger {
@@ -52,7 +51,6 @@ public class ItemConstructableTriggerV2 extends ItemConstructableTrigger {
             // Never run the construction logic from the dismantle input path.
             return true;
         }
-        if (!world.isRemote) DismantleManager.INSTANCE.onDirectControllerUse(player, world, x, y, z, side);
         return super.onItemUseFirst(stack, player, world, x, y, z, side, hitX, hitY, hitZ);
     }
 

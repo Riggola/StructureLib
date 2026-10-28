@@ -60,23 +60,32 @@ public enum DismantleManager {
 
     @SubscribeEvent
     public void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-        UUID id = event.player.getUniqueID();
-        holds.remove(id);
-        jobs.remove(id);
-        latched.remove(id);
-        links.remove(id);
-        clearSessionWirelessTags(event.player);
+        clearPlayerSession(event.player);
     }
 
     @SubscribeEvent
     public void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        UUID id = event.player.getUniqueID();
+        clearPlayerSession(event.player);
+    }
+
+    @SubscribeEvent
+    public void onDimensionChange(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (event.player instanceof EntityPlayerMP) {
+            unlink((EntityPlayerMP) event.player, false);
+            UUID id = event.player.getUniqueID();
+            holds.remove(id);
+            jobs.remove(id);
+            latched.remove(id);
+        }
+    }
+
+    private void clearPlayerSession(EntityPlayer player) {
+        UUID id = player.getUniqueID();
         holds.remove(id);
         jobs.remove(id);
         latched.remove(id);
         links.remove(id);
-        // Recover safely from a disconnect before the previous session could clean up NBT.
-        clearSessionWirelessTags(event.player);
+        clearSessionWirelessTags(player);
     }
 
     private static void clearSessionWirelessTags(EntityPlayer player) {
@@ -97,106 +106,119 @@ public enum DismantleManager {
     public void onServerTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         tick++;
-        // Expired links must also clear the item's temporary Wireless overlay.
-        // This covers dimension changes, removed controllers and a changed held item.
+        // Keep links across item changes and unloaded chunks, but discard removed controllers.
         for (WirelessLink link : new ArrayList<>(links.values())) validLink(link.player);
         Input input;
         while ((input = inputs.poll()) != null) {
             queued.decrementAndGet();
             if (input.player.isDead) continue;
-            UUID id = input.player.getUniqueID();
-            switch (input.action) {
-                case DismantleInputMessage.TOGGLE:
-                    holds.remove(id);
-                    latched.remove(id);
-                    ItemStack stack = input.player.getHeldItem();
-                    if (stack != null && stack.getItem() instanceof ItemConstructableTriggerV2) {
-                        ProjectorMode mode = ProjectorMode.toggle(stack);
-                        input.player.inventory.markDirty();
-                        input.player.inventoryContainer.detectAndSendChanges();
-                        if (mode == ProjectorMode.DISMANTLE) {
-                            say(input.player, "structurelib.dismantle.mode.dismantle");
-                        } else {
-                            say(input.player, "structurelib.dismantle.mode.build");
-                        }
-                    }
-                    break;
-                case DismantleInputMessage.BIND:
-                    bind(input.player, input.target);
-                    break;
-                case DismantleInputMessage.UNLINK:
-                    if (ProjectorMode.isWireless(input.player.getHeldItem())) unlink(input.player, true);
-                    break;
-                case DismantleInputMessage.REMOTE_BUILD:
-                    buildLinked(input.player);
-                    break;
-                case DismantleInputMessage.PROMPT:
-                    ItemStack promptStack = input.player.getHeldItem();
-                    if (promptStack != null && promptStack.getItem() instanceof ItemConstructableTriggerV2
-                            && ProjectorMode.get(promptStack) == ProjectorMode.DISMANTLE) {
-                        if (input.target.x == DismantleInputMessage.REMOTE_TARGET_X) {
-                            // A remote prompt is only valid when a live wireless link exists.
-                            WirelessLink link = ProjectorMode.isWireless(promptStack) ? validLink(input.player) : null;
-                            if (link != null) promptDismantle(input.player, link.controller);
-                        } else if (input.player.worldObj.blockExists(input.target.x, input.target.y, input.target.z)
-                                && input.player
-                                        .getDistanceSq(input.target.x + 0.5, input.target.y + 0.5, input.target.z + 0.5)
-                                        <= 36) {
-                                            MovingObjectPosition sight = rayTraceController(input.player);
-                                            if (sight != null
-                                                    && sight.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
-                                                    && sight.blockX == input.target.x
-                                                    && sight.blockY == input.target.y
-                                                    && sight.blockZ == input.target.z) {
-                                                TileEntity tile = input.player.worldObj
-                                                        .getTileEntity(input.target.x, input.target.y, input.target.z);
-                                                if (tile != null
-                                                        && ConstructableUtility.getConstructable(tile, sight.sideHit)
-                                                                != null) {
-                                                    unlinkIfOtherController(input.player, input.target);
-                                                    promptDismantle(input.player, tile);
-                                                }
-                                            }
-                                        }
-                    }
-                    break;
-                case DismantleInputMessage.RELEASE:
-                    holds.remove(id);
-                    latched.remove(id);
-                    break;
-                case DismantleInputMessage.HOLD:
-                    ItemStack heldItem = input.player.getHeldItem();
-                    if (heldItem == null || !(heldItem.getItem() instanceof ItemConstructableTriggerV2)) break;
-                    if (ProjectorMode.get(heldItem) != ProjectorMode.DISMANTLE) break;
-                    boolean wireless = ProjectorMode.isWireless(heldItem);
-                    Position target = input.target;
-                    if (wireless && input.target.x == DismantleInputMessage.REMOTE_TARGET_X) {
-                        WirelessLink link = validLink(input.player);
-                        if (link == null) break;
-                        target = link.target;
-                    } else {
-                        unlinkIfOtherController(input.player, input.target);
-                        wireless = ProjectorMode.isWireless(heldItem);
-                        WirelessLink link = wireless ? validLink(input.player) : null;
-                        // A click on a different, unsupported block must not remotely dismantle the old link.
-                        if (wireless && (link == null || !link.target.equals(target))) break;
-                    }
-                    if (jobs.containsKey(id) || latched.containsKey(id)) {
-                        latched.put(id, tick);
-                        break;
-                    }
-                    Hold hold = holds.get(id);
-                    if (hold == null || !hold.target.equals(target) || hold.wireless != wireless) {
-                        hold = new Hold(input.player, target, wireless);
-                        holds.put(id, hold);
-                    }
-                    hold.lastPulse = tick;
-                    break;
-                default:
-                    break;
-            }
+            handleInput(input);
+        }
+        updateHolds();
+        updateJobs();
+        latched.entrySet().removeIf(e -> tick - e.getValue() > 3);
+    }
+
+    private void handleInput(Input input) {
+        UUID id = input.player.getUniqueID();
+        switch (input.action) {
+            case DismantleInputMessage.TOGGLE:
+                toggleMode(input.player);
+                break;
+            case DismantleInputMessage.BIND:
+                bind(input.player, input.target);
+                break;
+            case DismantleInputMessage.UNLINK:
+                if (ProjectorMode.isWireless(input.player.getHeldItem())) unlink(input.player, true);
+                break;
+            case DismantleInputMessage.REMOTE_BUILD:
+                buildLinked(input.player);
+                break;
+            case DismantleInputMessage.PROMPT:
+                handlePrompt(input);
+                break;
+            case DismantleInputMessage.RELEASE:
+                holds.remove(id);
+                latched.remove(id);
+                break;
+            case DismantleInputMessage.HOLD:
+                handleHold(input, id);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void toggleMode(EntityPlayerMP player) {
+        UUID id = player.getUniqueID();
+        holds.remove(id);
+        latched.remove(id);
+        ItemStack stack = player.getHeldItem();
+        if (stack == null || !(stack.getItem() instanceof ItemConstructableTriggerV2)) return;
+        ProjectorMode mode = ProjectorMode.toggle(stack);
+        player.inventory.markDirty();
+        player.inventoryContainer.detectAndSendChanges();
+        say(
+                player,
+                mode == ProjectorMode.DISMANTLE ? "structurelib.dismantle.mode.dismantle"
+                        : "structurelib.dismantle.mode.build");
+    }
+
+    private void handlePrompt(Input input) {
+        EntityPlayerMP player = input.player;
+        ItemStack stack = player.getHeldItem();
+        if (stack == null || !(stack.getItem() instanceof ItemConstructableTriggerV2)
+                || ProjectorMode.get(stack) != ProjectorMode.DISMANTLE)
+            return;
+
+        if (input.target.x == DismantleInputMessage.REMOTE_TARGET_X) {
+            WirelessLink link = ProjectorMode.isWireless(stack) ? validLink(player) : null;
+            if (link != null) promptDismantle(player, link.controller);
+            return;
         }
 
+        Position pos = input.target;
+        if (!player.worldObj.blockExists(pos.x, pos.y, pos.z)
+                || player.getDistanceSq(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5) > 36)
+            return;
+        MovingObjectPosition sight = rayTraceController(player);
+        if (!isControllerHit(sight, pos)) return;
+        TileEntity controller = player.worldObj.getTileEntity(pos.x, pos.y, pos.z);
+        if (controller == null || ConstructableUtility.getConstructable(controller, sight.sideHit) == null) return;
+        promptDismantle(player, controller);
+    }
+
+    private void handleHold(Input input, UUID id) {
+        EntityPlayerMP player = input.player;
+        ItemStack stack = player.getHeldItem();
+        if (stack == null || !(stack.getItem() instanceof ItemConstructableTriggerV2)
+                || ProjectorMode.get(stack) != ProjectorMode.DISMANTLE)
+            return;
+
+        boolean wireless = ProjectorMode.isWireless(stack);
+        Position target = input.target;
+        if (wireless && target.x == DismantleInputMessage.REMOTE_TARGET_X) {
+            WirelessLink link = validLink(player);
+            if (link == null) return;
+            target = link.target;
+        } else {
+            WirelessLink link = wireless ? validLink(player) : null;
+            if (wireless && (link == null || !link.target.equals(target))) return;
+        }
+
+        if (jobs.containsKey(id) || latched.containsKey(id)) {
+            latched.put(id, tick);
+            return;
+        }
+        Hold hold = holds.get(id);
+        if (hold == null || !hold.target.equals(target) || hold.wireless != wireless) {
+            hold = new Hold(player, target, wireless);
+            holds.put(id, hold);
+        }
+        hold.lastPulse = tick;
+    }
+
+    private void updateHolds() {
         for (Map.Entry<UUID, Hold> entry : new ArrayList<>(holds.entrySet())) {
             Hold hold = entry.getValue();
             if (tick - hold.lastPulse > 2 || !valid(hold)) {
@@ -218,10 +240,12 @@ public enum DismantleManager {
                 if (job != null) jobs.put(entry.getKey(), job);
             }
         }
+    }
+
+    private void updateJobs() {
         for (Map.Entry<UUID, Job> entry : new ArrayList<>(jobs.entrySet())) {
             if (!entry.getValue().process()) jobs.remove(entry.getKey());
         }
-        latched.entrySet().removeIf(e -> tick - e.getValue() > 3);
     }
 
     private boolean valid(Hold hold) {
@@ -244,11 +268,7 @@ public enum DismantleManager {
         if (player.getDistanceSq(p.x + 0.5, p.y + 0.5, p.z + 0.5) > 36 || !player.worldObj.blockExists(p.x, p.y, p.z))
             return false;
         MovingObjectPosition sight = rayTraceController(player);
-        if (sight == null || sight.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
-                || sight.blockX != p.x
-                || sight.blockY != p.y
-                || sight.blockZ != p.z)
-            return false;
+        if (!isControllerHit(sight, p)) return false;
         TileEntity target = player.worldObj.getTileEntity(p.x, p.y, p.z);
         return target != null && ConstructableUtility.getConstructable(target, sight.sideHit) != null;
     }
@@ -263,11 +283,8 @@ public enum DismantleManager {
             constructable = link == null ? null : ConstructableUtility.getConstructable(link.controller, link.side);
         } else {
             MovingObjectPosition sight = rayTraceController(hold.player);
-            constructable = controller == null || sight == null
-                    || sight.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
-                    || sight.blockX != p.x
-                    || sight.blockY != p.y
-                    || sight.blockZ != p.z ? null : ConstructableUtility.getConstructable(controller, sight.sideHit);
+            constructable = controller == null || !isControllerHit(sight, p) ? null
+                    : ConstructableUtility.getConstructable(controller, sight.sideHit);
         }
         if (constructable == null) {
             say(hold.player, "structurelib.dismantle.unsupported");
@@ -289,24 +306,19 @@ public enum DismantleManager {
             say(hold.player, "structurelib.dismantle.unsupported");
             return null;
         }
-        Set<Position> shared = null;
-        if (ConfigurationHandler.INSTANCE.isDismantleProtectSharedBlocks()) {
-            shared = SharedBlockProtection
-                    .findShared(world, controller, capture, ProjectorTier.forStructure(hold.stack));
-            if (shared == null) {
-                say(hold.player, "structurelib.dismantle.shared_scan_failed");
-                return null;
-            }
-            if (!shared.isEmpty()) say(hold.player, "structurelib.dismantle.shared_preserved", shared.size());
+        Set<Position> shared = SharedBlockProtection
+                .findShared(world, controller, capture, ProjectorTier.forStructure(hold.stack));
+        if (shared == null) {
+            say(hold.player, "structurelib.dismantle.shared_scan_failed");
+            return null;
         }
+        if (!shared.isEmpty()) say(hold.player, "structurelib.dismantle.shared_preserved", shared.size());
         Queue<Candidate> queue = new ArrayDeque<>();
         for (Candidate candidate : capture.getCandidates()) {
-            if (shared == null || !shared.contains(candidate.pos)) queue.add(candidate);
+            if (!shared.contains(candidate.pos)) queue.add(candidate);
         }
         if (queue.isEmpty()) {
             say(hold.player, "structurelib.dismantle.no_unshared_blocks");
-            WirelessLink link = links.get(hold.player.getUniqueID());
-            if (link != null && link.target.equals(p)) unlink(hold.player, true);
             return null;
         }
         say(hold.player, "structurelib.dismantle.started");
@@ -381,13 +393,12 @@ public enum DismantleManager {
                 || player.getDistanceSq(requested.x + 0.5, requested.y + 0.5, requested.z + 0.5) > 36)
             return;
         MovingObjectPosition sight = rayTraceController(player);
-        if (sight == null || sight.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
-                || sight.blockX != requested.x
-                || sight.blockY != requested.y
-                || sight.blockZ != requested.z)
-            return;
+        if (!isControllerHit(sight, requested)) return;
         TileEntity controller = player.worldObj.getTileEntity(requested.x, requested.y, requested.z);
         if (controller == null || ConstructableUtility.getConstructable(controller, sight.sideHit) == null) return;
+        WirelessLink previous = links.get(player.getUniqueID());
+        if (previous != null) ProjectorMode.setWireless(previous.projector, false);
+        clearSessionWirelessTags(player);
         ProjectorMode.setWireless(projector, true);
         links.put(player.getUniqueID(), new WirelessLink(player, projector, controller, requested, sight.sideHit));
         holds.remove(player.getUniqueID());
@@ -408,16 +419,25 @@ public enum DismantleManager {
     private WirelessLink validLink(EntityPlayerMP player) {
         WirelessLink link = links.get(player.getUniqueID());
         if (link == null) return null;
-        if (player.isDead || player.dimension != link.dimension
-                || player.worldObj != link.world
-                || player.inventory.currentItem != link.slot
-                || player.getHeldItem() == null
-                || !ItemStack.areItemStacksEqual(player.getHeldItem(), link.projector)
-                || !link.world.blockExists(link.target.x, link.target.y, link.target.z)
-                || link.world.getTileEntity(link.target.x, link.target.y, link.target.z) != link.controller) {
+        if (player.isDead || player.dimension != link.dimension || player.worldObj != link.world) {
             unlink(player, false);
             return null;
         }
+        if (!link.world.blockExists(link.target.x, link.target.y, link.target.z)) return null;
+        if (link.world.getBlock(link.target.x, link.target.y, link.target.z) != link.block
+                || link.world.getBlockMetadata(link.target.x, link.target.y, link.target.z) != link.metadata) {
+            unlink(player, false);
+            return null;
+        }
+        TileEntity controller = link.world.getTileEntity(link.target.x, link.target.y, link.target.z);
+        if (controller == null) return null;
+        Object meta = invokeNoArgs(controller, "getMetaTileEntity");
+        if (controller.getClass() != link.controllerClass || (meta != null && meta.getClass() != link.metaTileClass)) {
+            unlink(player, false);
+            return null;
+        }
+        if (link.metaTileClass != null && meta == null) return null;
+        link.controller = controller;
         return link;
     }
 
@@ -436,33 +456,10 @@ public enum DismantleManager {
             return;
         }
         ProjectorMode.setWireless(link.projector, false);
-        player.inventory.markDirty();
+        clearSessionWirelessTags(player);
         player.inventoryContainer.detectAndSendChanges();
         StructureLib.sendWirelessLink(new WirelessLinkMessage(false, 0, 0, 0, player.dimension, 0), player);
         if (announce) say(player, "structurelib.wireless.unlinked");
-    }
-
-    private void unlinkIfOtherController(EntityPlayerMP player, Position other) {
-        WirelessLink link = links.get(player.getUniqueID());
-        if (link != null && !link.target.equals(other)) {
-            MovingObjectPosition sight = rayTraceController(player);
-            if (sight == null || sight.typeOfHit != MovingObjectPosition.MovingObjectType.BLOCK
-                    || sight.blockX != other.x
-                    || sight.blockY != other.y
-                    || sight.blockZ != other.z)
-                return;
-            TileEntity tile = player.worldObj.getTileEntity(other.x, other.y, other.z);
-            if (tile != null && ConstructableUtility.getConstructable(tile, sight.sideHit) != null)
-                unlink(player, true);
-        }
-    }
-
-    public void onDirectControllerUse(EntityPlayer player, World world, int x, int y, int z, int side) {
-        if (!(player instanceof EntityPlayerMP playerMP)) return;
-        WirelessLink link = links.get(playerMP.getUniqueID());
-        if (link == null || (world == link.world && link.target.equals(new Position(x, y, z)))) return;
-        TileEntity tile = world.getTileEntity(x, y, z);
-        if (tile != null && ConstructableUtility.getConstructable(tile, side) != null) unlink(playerMP, true);
     }
 
     private void buildLinked(EntityPlayerMP player) {
@@ -477,13 +474,8 @@ public enum DismantleManager {
             say(player, "structurelib.wireless.no_link");
             return;
         }
-        if (ConstructableUtility
-                .handleRemote(held, player, link.world, link.target.x, link.target.y, link.target.z, link.side))
-            unlink(player, true);
-    }
-
-    public void onCompletedBuild(EntityPlayerMP player) {
-        if (links.containsKey(player.getUniqueID())) unlink(player, true);
+        ConstructableUtility
+                .handleRemote(held, player, link.world, link.target.x, link.target.y, link.target.z, link.side);
     }
 
     /** Vanilla 1.7.10 rayTrace is not available on a dedicated-server EntityPlayerMP. */
@@ -493,6 +485,13 @@ public enum DismantleManager {
         Vec3 eyes = Vec3.createVectorHelper(player.posX, player.posY + player.getEyeHeight(), player.posZ);
         Vec3 end = eyes.addVector(look.xCoord * 5.0D, look.yCoord * 5.0D, look.zCoord * 5.0D);
         return player.worldObj.rayTraceBlocks(eyes, end);
+    }
+
+    private static boolean isControllerHit(MovingObjectPosition hit, Position pos) {
+        return hit != null && hit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
+                && hit.blockX == pos.x
+                && hit.blockY == pos.y
+                && hit.blockZ == pos.z;
     }
 
     private static final class Input {
@@ -513,11 +512,14 @@ public enum DismantleManager {
         final EntityPlayerMP player;
         final ItemStack projector;
         final World world;
-        final TileEntity controller;
+        TileEntity controller;
         final Position target;
-        final int slot;
         final int dimension;
         final int side;
+        final Block block;
+        final int metadata;
+        final Class<?> controllerClass;
+        final Class<?> metaTileClass;
 
         WirelessLink(EntityPlayerMP player, ItemStack projector, TileEntity controller, Position target, int side) {
             this.player = player;
@@ -525,9 +527,13 @@ public enum DismantleManager {
             this.world = player.worldObj;
             this.controller = controller;
             this.target = target;
-            this.slot = player.inventory.currentItem;
             this.dimension = player.dimension;
             this.side = side;
+            this.block = world.getBlock(target.x, target.y, target.z);
+            this.metadata = world.getBlockMetadata(target.x, target.y, target.z);
+            this.controllerClass = controller.getClass();
+            Object meta = invokeNoArgs(controller, "getMetaTileEntity");
+            this.metaTileClass = meta == null ? null : meta.getClass();
         }
     }
 
@@ -640,8 +646,6 @@ public enum DismantleManager {
             }
             if (!remaining.isEmpty()) return true;
             say(player, "structurelib.dismantle.complete");
-            WirelessLink link = INSTANCE.links.get(player.getUniqueID());
-            if (link != null && link.target.equals(origin)) INSTANCE.unlink(player, true);
             return false;
         }
     }

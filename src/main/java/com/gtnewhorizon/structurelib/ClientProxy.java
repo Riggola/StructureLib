@@ -747,11 +747,8 @@ public class ClientProxy extends CommonProxy {
                             || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL);
                     if (air) {
                         event.setCanceled(true);
-                        if (ProjectorMode.isWireless(heldItem)) {
-                            if (player.isSneaking()) StructureLib
-                                    .sendToServer(new DismantleInputMessage(DismantleInputMessage.UNLINK, 0, 0, 0));
-                            else if (!ctrl) StructureLib
-                                    .sendToServer(new DismantleInputMessage(DismantleInputMessage.TOGGLE, 0, 0, 0));
+                        if (ProjectorMode.isWireless(heldItem) && player.isSneaking()) {
+                            StructureLib.sendToServer(new DismantleInputMessage(DismantleInputMessage.UNLINK, 0, 0, 0));
                         } else if (!ctrl && !player.isSneaking()) {
                             StructureLib.sendToServer(new DismantleInputMessage(DismantleInputMessage.TOGGLE, 0, 0, 0));
                         }
