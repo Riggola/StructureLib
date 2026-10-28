@@ -95,9 +95,10 @@ public class ItemConstructableTriggerV2 extends ItemConstructableTrigger {
 
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.mode.separator"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.mode.dismantle"));
+        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.2"));
+        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.3"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.0"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.1"));
-        tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.2"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.5"));
         tooltip.add(translateToLocal("item.structurelib.constructableTrigger.dismantle.desc.6"));
 
